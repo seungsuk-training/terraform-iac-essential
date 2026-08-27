@@ -102,20 +102,44 @@ Terraform, Git과 AWS CLI는 Local PC에 설치하지 않아도 됩니다. 해�
 
 ### 1-2. Ubuntu Development EC2 생성
 
-먼저 AWS Console에서 Terraform 개발환경으로 사용할 EC2를 생성합니다.
+먼저 Development EC2를 배치할 Default VPC가 현재 Region에 있는지 확인합니다.
+
+AWS Console 상단에서 Region을 `ap-northeast-2`로 선택한 후:
+
+1. VPC → Your VPCs
+2. `default` VPC가 있는지 확인
+3. 없다면 Actions → Create default VPC
+4. 생성이 완료되면 Default VPC와 Default Subnet이 준비되었는지 확인
+
+Default VPC 확인이 끝나면 Terraform 개발환경으로 사용할 EC2를 생성합니다.
 
 AWS Console → EC2 → Instances → Launch instances:
 
 - Name: `terraform-iac-essential-dev`
 - AMI: `Ubuntu Server 24.04 LTS`
 - Architecture: x86_64 권장
-- Instance type: 자신의 계정과 현재 AWS Free Tier 정책에서 사용 가능한 소형 Type
-- Key pair: 새 Key Pair 생성 후 Private Key 다운로드
+- Instance type: `t3.medium`
+- Key pair: 새 Key Pair `tfkey` 생성 후 Private Key 다운로드
+- Network: Default VPC
 - Public IPv4: Enabled
-- Security Group: SSH / TCP 22 / Source `My IP`
+- Security Group name: `Code-Server-SG`
+- Security Group rule: SSH / TCP 22 / Source `My IP`
+- Storage: 30 GiB
 - Advanced details → IAM instance profile: 이 단계에서는 선택하지 않아도 됨
 
-특정 Instance Type이 항상 Free Tier라고 가정하지 않습니다. Launch 전에 자신의 계정에서 표시되는 Free Tier 또는 예상 비용을 확인합니다.
+`t3.medium`은 Tool 설치와 Terraform Provider 초기화가 지나치게 느려지는 것을 줄이기 위한 교육 권장 사양입니다. Free Tier 대상이라고 가정하지 말고 Launch 전에 예상 비용을 확인하며, 실습 종료 후 반드시 Terminate합니다.
+
+다운로드한 `tfkey.pem` Private Key는 Git Repository나 일반 Download Folder에 계속 두지 말고 Local PC 사용자 Home Directory의 `.ssh` Folder에 저장하는 것을 권장합니다.
+
+macOS/Linux 예:
+
+```bash
+mkdir -p ~/.ssh
+mv ~/Downloads/tfkey.pem ~/.ssh/tfkey.pem
+chmod 400 ~/.ssh/tfkey.pem
+```
+
+Windows에서는 `tfkey.pem`을 `%USERPROFILE%\.ssh\tfkey.pem`으로 이동합니다. 다른 Folder에 다운로드되었다면 실제 다운로드 경로에 맞게 이동합니다.
 
 Development EC2는 Terraform으로 생성하지 않습니다.
 
@@ -130,7 +154,7 @@ Private Web EC2
 → Launch Template + Auto Scaling Group이 만드는 실제 Web Server
 ```
 
-Instance가 `Running` 상태가 되고 Status checks가 통과할 때까지 기다립니다. Public IPv4 주소와 사용한 Key Pair 이름을 기록합니다.
+Instance가 `Running` 상태가 되고 Status checks가 통과할 때까지 기다립니다. Public IPv4 주소와 Key Pair 이름 `tfkey`를 기록합니다.
 
 ### 1-3. `TerraformLabRole` 생성과 EC2 연결
 
@@ -185,11 +209,11 @@ Private Key는 안전하게 보관하고 Git이나 공유 Folder에 넣지 않�
 macOS/Linux:
 
 ```bash
-chmod 400 <다운로드한-key>.pem
-ssh -i <다운로드한-key>.pem ubuntu@<Development-EC2-Public-IP>
+chmod 400 ~/.ssh/tfkey.pem
+ssh -i ~/.ssh/tfkey.pem ubuntu@<Development-EC2-Public-IP>
 ```
 
-Windows에서는 Private Key를 사용자 `.ssh` Directory에 두고 VS Code에서 해당 절대 경로를 선택합니다.
+Windows에서는 `%USERPROFILE%\.ssh\tfkey.pem`을 사용하고 VS Code에서 해당 절대 경로를 선택합니다.
 
 VS Code에서:
 
@@ -198,8 +222,10 @@ VS Code에서:
 3. 다음 형식 입력
 
 ```text
-ssh -i <Private-Key-절대경로> ubuntu@<Development-EC2-Public-IP>
+ssh -i ~/.ssh/tfkey.pem ubuntu@<Development-EC2-Public-IP>
 ```
+
+Windows에서는 `~/.ssh/tfkey.pem` 대신 `%USERPROFILE%\.ssh\tfkey.pem`의 절대 경로를 입력합니다.
 
 4. SSH Configuration File 선택
 5. `Remote-SSH: Connect to Host`
@@ -211,7 +237,7 @@ SSH Config 예:
 Host terraform-lab
   HostName <Development-EC2-Public-IP>
   User ubuntu
-  IdentityFile <Private-Key-절대경로>
+  IdentityFile ~/.ssh/tfkey.pem
 ```
 
 VS Code 좌측 하단에 `SSH: terraform-lab`이 표시되면 성공입니다.
