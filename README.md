@@ -27,17 +27,40 @@ AWS IAM 실습 계정과 GitHub 저장소 URL이 필요합니다. 별도 Access 
 ```bash
 git clone <repository-url>
 cd terraform-iac-essential
-terraform version
 aws sts get-caller-identity
 git --version
 ```
 
-예상 결과: Terraform/Git 버전과 현재 실습용 AWS Account, IAM ARN이 출력됩니다.
+예상 결과: Git 버전과 현재 실습용 AWS Account, IAM ARN이 출력됩니다. AWS CloudShell 환경에 따라 Terraform CLI는 기본 설치되어 있지 않을 수 있으므로 다음 단계에서 설치합니다.
 
 ## Lab 1. AWS CloudShell 실습 환경 확인 (15분)
 
+### 1-1. Terraform CLI 설치
+
+CloudShell에서 다음 저장소 스크립트를 실행합니다. 기본 설치 버전은 이 Lab에서 검증한 `1.15.8`입니다.
+
 ```bash
-cd terraform
+cd ~/terraform-iac-essential
+bash scripts/install-terraform.sh
+source ~/.bashrc
+terraform version
+```
+
+스크립트는 CPU Architecture를 확인하고 HashiCorp 공식 Release와 SHA256 Checksum을 내려받아 검증한 뒤 Terraform을 `$HOME/.local/bin`에 설치합니다. Public CloudShell의 `$HOME`은 Session 간 유지되므로 매번 다시 설치할 필요가 없습니다. CloudShell VPC Environment는 `$HOME`이 영속적이지 않을 수 있습니다.
+
+예상 결과: `Terraform v1.15.8`과 `linux_amd64` 또는 `linux_arm64`가 출력됩니다.
+
+`terraform: command not found`가 계속 표시되면 다음을 실행합니다.
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+terraform version
+```
+
+### 1-2. Terraform 초기화와 검증
+
+```bash
+cd ~/terraform-iac-essential/terraform
 terraform fmt -recursive
 terraform init
 terraform validate
