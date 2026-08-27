@@ -452,7 +452,7 @@ Public IPv4 주소를 Browser에서 열어 다음 값이 표시되는지 확인�
 
 다운로드한 예제 앱에는 RDS 연결 화면도 포함되어 있지만, 이번 4시간 과정에서는 DB를 생성하거나 연결하지 않습니다. 이후 RDS 실습으로 확장할 때 활용할 수 있습니다.
 
-User Data는 AL2023의 기본 IMDSv2 요구사항에 맞춰 원본 앱의 Metadata 조회 파일을 교체합니다. `unzip`과 `curl` 설치, PHP-FPM 시작도 Script에 포함되어 있으므로 `userdata/image-builder.sh` 전체를 그대로 붙여넣습니다.
+User Data는 Amazon Linux 2023에 Apache, PHP와 MariaDB 관련 Package를 설치하고 Apache를 활성화한 뒤 AWS Academy 예제 앱을 `/var/www/html`에 배포합니다. `userdata/image-builder.sh` 전체를 그대로 붙여넣고, User Data 실행이 끝난 후 Browser에서 Instance ID, Availability Zone과 Current CPU Load가 표시되는지 확인합니다.
 
 Browser에서 페이지가 열리지 않거나 Metadata가 표시되지 않으면 `tfkey`로 Image Builder에 SSH 접속합니다. Amazon Linux 2023의 기본 User는 `ec2-user`입니다.
 
