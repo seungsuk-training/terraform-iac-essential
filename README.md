@@ -440,7 +440,16 @@ EC2 → Instances → Launch instances:
 - 새 Security Group: HTTP 80 허용
 - Advanced details → User data: `userdata/image-builder.sh` 내용 붙여넣기
 
-Public IPv4 주소를 Browser에서 열어 `Terraform IaC Essential`을 확인합니다.
+Public IPv4 주소를 Browser에서 열어 다음 값이 표시되는지 확인합니다.
+
+- Instance ID: 현재 Golden Image Builder EC2의 ID
+- Availability Zone: 현재 Instance가 실행 중인 AZ
+
+이후 Golden AMI로 만든 Web EC2를 ALB를 통해 여러 번 새로고침하면 응답한 Instance ID와 Availability Zone이 바뀌는 것을 확인할 수 있습니다. 이를 통해 ALB가 Multi-AZ의 여러 Instance로 요청을 분산하는 모습을 실습할 수 있습니다.
+
+다운로드한 예제 앱에는 RDS 연결 화면도 포함되어 있지만, 이번 4시간 과정에서는 DB를 생성하거나 연결하지 않습니다. 이후 RDS 실습으로 확장할 때 활용할 수 있습니다.
+
+User Data는 AL2023의 기본 IMDSv2 요구사항에 맞춰 원본 앱의 Metadata 조회 파일을 교체합니다. `unzip`과 `curl` 설치, PHP-FPM 시작도 Script에 포함되어 있으므로 `userdata/image-builder.sh` 전체를 그대로 붙여넣습니다.
 
 Actions → Image and templates → Create image:
 
