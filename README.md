@@ -34,8 +34,6 @@ Target Group / Application Load Balancer
 → 선택적 Refactoring
 → Terraform Cleanup
 
-5교시
-Optional Q&A (희망자, 1시간)
 ```
 
 > Terraform을 실행하기 전에 Infrastructure as Code 개발환경을 먼저 구성합니다. 이번 과정에서는 교육생의 Local OS 차이를 최소화하고 동일한 Linux 환경을 제공하기 위해 AWS Ubuntu EC2를 Terraform Development Environment로 사용합니다.
@@ -616,7 +614,7 @@ kiro-cli
 
 ### 5-3. 선택적 심화 — Subnet Refactoring
 
-시간이 충분할 때만 [`ai/prompts.md`](ai/prompts.md)의 Step 3을 진행합니다. 기본 15~20분 Hands-on은 Step 1과 Step 2만으로 완료되며, 교육이 지연되면 강사가 이 단계만 짧게 시연할 수 있습니다.
+시간이 충분할 때만 [`ai/prompts.md`](ai/prompts.md)의 Step 3을 진행합니다. 기본 15~20분 Hands-on은 Step 1과 Step 2만으로 완료되며, 시간이 부족하면 선택적 Step 3은 생략합니다.
 
 선택적 Refactoring 전에 현재 tracked Terraform 변경을 보관합니다. 실습에서 설정한 `golden_ami_id` 같은 변경을 나중에 복원하기 위한 파일입니다.
 
@@ -726,34 +724,3 @@ Subnet 또는 VPC에서 Dependency 오류가 발생하면 Golden Image Builder�
 AWS Console에서 IAM → Roles → `TerraformLabRole`을 선택하여 삭제합니다. Development EC2를 먼저 Terminate하고 Instance Profile 연결이 해제된 뒤 진행합니다.
 
 AMI Deregister만으로 EBS Snapshot은 삭제되지 않습니다. 개인 AWS Account에 비용 발생 Resource가 남지 않았는지 EC2와 VPC Console에서 최종 확인합니다.
-
-## Optional Q&A — 1시간
-
-필수 4시간 과정 이후 희망자만 참여합니다.
-
-질문에 따라 다룰 수 있는 주제:
-
-- NAT Gateway와 VPC Endpoint
-- RDS
-- State와 Remote Backend
-- Module
-- `count`, `for_each`, `map(object)`
-- Naming과 Tagging
-- Terraform 실무 운영
-
-이 주제들은 필수 Hands-on 범위에 추가하지 않습니다.
-
-## 4시간 진행 Tip
-
-가장 큰 시간 병목:
-
-- Key Pair와 Remote-SSH 최초 연결
-- IAM Role/Instance Profile 전파
-- Ubuntu Tool 설치와 AWS Provider 다운로드
-- Golden Image Builder User Data
-- AMI 생성 대기
-- Target Group Health 전환
-- Kiro CLI 최초 Device Flow 로그인
-- Cleanup
-
-교육 전 Role 생성 및 Remote-SSH를 사전 안내하고, 강사는 동일한 Ubuntu 24.04 Script와 Kiro CLI Device Flow 로그인을 리허설합니다. AMI 대기시간에는 Network Code를 설명하고 강사용 예비 Golden AMI를 준비합니다. Kiro 인증이 지연되면 분석/개선 Prompt는 Instructor-led 방식으로 빠르게 전환하되, 교육생 Hands-on을 기본 운영으로 합니다.
