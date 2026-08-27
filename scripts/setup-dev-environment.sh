@@ -63,8 +63,21 @@ if ! command -v aws >/dev/null 2>&1 ||
   fi
 fi
 
+export PATH="${HOME}/.local/bin:${PATH}"
+if ! command -v kiro-cli >/dev/null 2>&1; then
+  curl -fsSL https://cli.kiro.dev/install | bash
+  hash -r
+fi
+
+if ! command -v kiro-cli >/dev/null 2>&1; then
+  echo "Kiro CLI was installed, but kiro-cli is not on PATH." >&2
+  echo "Open a new terminal and run kiro-cli --version." >&2
+  exit 1
+fi
+
 echo
 echo "Development environment is ready."
 git --version
 terraform version
 aws --version
+kiro-cli --version

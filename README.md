@@ -1,6 +1,6 @@
 # Terraform IaC Essential Hands-on
 
-개인 노트북의 Visual Studio Code에서 Remote-SSH로 Ubuntu Development EC2에 접속하여 Terraform으로 AWS Highly Available Web Service를 구축하는 4시간 Hands-on 과정입니다. 마지막에는 강사가 Kiro CLI로 AI-assisted IaC Workflow를 시연합니다.
+개인 노트북의 Visual Studio Code에서 Remote-SSH로 Ubuntu Development EC2에 접속하여 Terraform으로 AWS Highly Available Web Service를 구축하는 4시간 Hands-on 과정입니다. 마지막에는 교육생이 Kiro CLI로 자신이 구축한 Terraform Project를 분석하며 AI-assisted IaC Workflow를 직접 실습합니다.
 
 ## Course Flow
 
@@ -26,10 +26,13 @@ Golden AMI 적용
 → Target Group
 
 4교시
-Application Load Balancer
-→ Web Service Verification
-→ Kiro CLI Instructor Demo
-→ Cleanup
+Target Group / Application Load Balancer
+→ ALB DNS로 Web Service 확인
+→ Kiro CLI Hands-on (15~20분)
+→ Architecture / Code 분석
+→ AI 개선안 확인
+→ 선택적 Refactoring
+→ Terraform Cleanup
 
 5교시
 Optional Q&A (희망자, 1시간)
@@ -47,7 +50,7 @@ Windows / macOS / Ubuntu
         ▼
 Ubuntu Development EC2
         │
-        ├── Git / Terraform / AWS CLI
+        ├── Git / Terraform / AWS CLI / Kiro CLI
         └── TerraformLabRole의 Temporary Credential
                          │
                          ▼
@@ -81,6 +84,7 @@ Ubuntu Development EC2
    ├── Git        OK
    ├── Terraform  OK
    ├── AWS CLI    OK
+   ├── Kiro CLI   OK
    └── IAM Role   OK
 ```
 
@@ -294,6 +298,7 @@ Script는 Ubuntu 24.04에서 다음을 수행합니다.
 - HashiCorp 공식 APT Repository 구성
 - Terraform 설치
 - AWS 공식 Installer로 AWS CLI v2 설치
+- Kiro 공식 Installer로 Kiro CLI 설치
 - Version 출력
 
 반복 실행해도 기존 Repository와 설치를 재사용하도록 구성했습니다.
@@ -314,12 +319,13 @@ VS Code Remote Terminal에서:
 git --version
 terraform version
 aws --version
+kiro-cli --version
 aws sts get-caller-identity
 ```
 
 성공 조건:
 
-- Git/Terraform/AWS CLI Version 출력
+- Git/Terraform/AWS CLI/Kiro CLI Version 출력
 - Account가 자신의 실습 AWS Account
 - ARN에 `assumed-role/TerraformLabRole` 포함
 
@@ -546,45 +552,119 @@ terraform output -raw alb_url
 
 URL을 Browser에서 열어 Web Page가 표시되면 Infrastructure Lab 성공입니다.
 
-## Lab 5. Kiro CLI Instructor Demo
+## Lab 5. Kiro CLI Hands-on — 15~20분
 
-Kiro CLI는 교육생 필수 설치 도구가 아닙니다. 다양한 Local OS와 4시간 제한을 고려하여 강사의 검증된 환경에서 과정 마지막 공식 Module로 진행합니다.
+> 지금까지 직접 구축한 Terraform Infrastructure를 AI가 분석하고 개선하도록 요청해 봅니다.
 
-강사는 [`ai/prompts.md`](ai/prompts.md)의 Scenario를 사용합니다.
+Kiro CLI는 Local Windows/macOS나 별도 EC2, WSL2 또는 AWS CloudShell이 아니라 모든 교육생이 공통으로 사용하는 Ubuntu Development EC2에서 실행합니다. 긴 Prompt 전문은 [`ai/prompts.md`](ai/prompts.md)를 열어 Copy & Paste합니다.
+
+AI가 Terraform과 Architecture를 대신 이해해 주는 것은 아닙니다. Terraform과 Architecture를 이해한 사람이 AI를 활용하면 코드 분석, 생성, Refactoring 및 검증 속도를 높일 수 있습니다. AI가 생성하거나 수정한 Infrastructure Code를 바로 적용하지 않고 반드시 `terraform validate`와 `terraform plan` 결과를 사람이 검토합니다.
+
+### 5-1. Kiro CLI 로그인
+
+환경 설정 Script에서 설치한 Version을 확인하고 Remote-SSH 환경에 적합한 Device Flow로 로그인합니다.
+
+```bash
+cd /home/ubuntu/terraform-iac-essential
+kiro-cli --version
+kiro-cli login --use-device-flow
+kiro-cli whoami
+```
+
+Terminal에 표시된 URL과 일회용 Code를 Local PC Browser에서 열어 인증합니다. 로그인은 사용자 Interaction이 필요하므로 환경 설정 Script에서 자동화하지 않습니다.
+
+### 5-2. 필수 Hands-on — 분석과 개선안 확인
+
+Repository Root에서 Kiro CLI를 시작합니다.
+
+```bash
+cd /home/ubuntu/terraform-iac-essential
+git status --short
+kiro-cli
+```
+
+[`ai/prompts.md`](ai/prompts.md)의 안전 제약 Prompt와 Step 1, Step 2를 순서대로 실행합니다.
 
 ```text
-현재 Architecture 분석
-→ Resource Dependency 설명
-→ 개선점 제안
-→ Subnet map(object) + for_each Refactoring
-→ git diff
-→ terraform fmt
-→ terraform validate
-→ terraform plan
+현재 Terraform Project 분석
+→ Architecture / Resource Dependency 설명 확인
+→ 개선 가능한 부분 확인
+→ 교육생의 Architecture 이해와 AI Output 비교
 → Human Verification
 ```
 
-AI가 생성한 Infrastructure Code를 바로 Apply하지 않습니다.
+최소 성공 조건:
+
+1. 자신의 Terraform Project를 Kiro CLI에서 분석
+2. Architecture와 Resource Dependency 설명 확인
+3. 반복, Variable, Naming, Tagging, Security, Availability, Maintainability 개선안 확인
+4. AI Output을 그대로 정답으로 사용하지 않고 사람이 검토해야 한다는 Workflow 이해
+
+명시적으로 작성한 Subnet Resource에서 반복을 발견했다면 다음 8일 과정의 발전 흐름을 Preview합니다.
 
 ```text
-Human
-  ↓
-Architecture / Requirement
-  ↓
-AI Assistance
-  ↓
-Terraform Code
-  ↓
-terraform plan
-  ↓
-Human Verification
-  ↓
-terraform apply
+명시적 Resource 작성
+→ 반복 발견
+→ count
+→ count의 한계
+→ object / map(object)
+→ for_each
 ```
 
-> AI가 Terraform과 Architecture를 대신 이해해 주는 것이 아닙니다. Terraform과 Architecture를 이해한 사람이 AI를 활용하면 코드 생성, 분석, Refactoring 및 검증을 더 빠르게 수행할 수 있습니다.
+이번 Essential Source는 초심자가 Resource와 Dependency를 직접 확인할 수 있도록 명시적 Resource 구조를 유지합니다.
 
-> AI가 생성하거나 수정한 Infrastructure Code를 바로 적용하지 않고 `terraform validate`와 `terraform plan` 결과를 사람이 검토합니다.
+### 5-3. 선택적 심화 — Subnet Refactoring
+
+시간이 충분할 때만 [`ai/prompts.md`](ai/prompts.md)의 Step 3을 진행합니다. 기본 15~20분 Hands-on은 Step 1과 Step 2만으로 완료되며, 교육이 지연되면 강사가 이 단계만 짧게 시연할 수 있습니다.
+
+선택적 Refactoring 전에 현재 tracked Terraform 변경을 보관합니다. 실습에서 설정한 `golden_ami_id` 같은 변경을 나중에 복원하기 위한 파일입니다.
+
+```bash
+cd /home/ubuntu/terraform-iac-essential
+git diff -- terraform > /tmp/terraform-before-kiro.patch
+```
+
+AI가 기존 Terraform 파일을 수정했다면 Apply하지 말고 다음까지만 실행합니다.
+
+```bash
+terraform -chdir=terraform fmt
+terraform -chdir=terraform validate
+terraform -chdir=terraform plan
+```
+
+```text
+AI Suggestion
+      ↓
+Code Change
+      ↓
+terraform fmt
+      ↓
+terraform validate
+      ↓
+terraform plan
+      ↓
+Human Review
+```
+
+Plan에서 Destroy, Replace 또는 예상하지 않은 Resource 변경이 보이면 적용하지 않습니다. Architecture가 같아도 `for_each` 전환으로 Resource Address가 바뀌면 기존 Resource를 다시 만들려는 Plan이 나올 수 있습니다. 이번 과정에서는 AI Refactoring 결과에 `terraform apply`하지 않습니다.
+
+### 5-4. Cleanup 전 Source 복원
+
+선택적 Refactoring을 진행한 교육생만 다음 명령으로 tracked Terraform Source를 원래 상태로 되돌리고, Refactoring 전에 존재했던 `terraform.tfvars` 등의 변경을 다시 적용합니다.
+
+```bash
+cd /home/ubuntu/terraform-iac-essential
+git restore --source=HEAD --worktree -- terraform
+if [ -s /tmp/terraform-before-kiro.patch ]; then
+  git apply /tmp/terraform-before-kiro.patch
+fi
+git status --short
+terraform -chdir=terraform plan
+```
+
+AI가 새로운 untracked `.tf` 파일을 만들었다면 `git status --short`에서 확인하고, AI Lab에서 생성된 파일이 맞는지 확인한 뒤 Cleanup 전에 제거합니다. 마지막 Plan이 AI Lab 이전 Infrastructure와 일치하는지 사람이 확인한 후 Lab 6으로 이동합니다.
+
+> AI Suggestion은 검증 전의 가설입니다. Infrastructure 변경의 최종 책임과 Apply 결정은 사람에게 있습니다.
 
 ## Lab 6. Cleanup — 비용 방지 필수
 
@@ -644,7 +724,6 @@ AMI Deregister만으로 EBS Snapshot은 삭제되지 않습니다. 개인 AWS Ac
 - Module
 - `count`, `for_each`, `map(object)`
 - Naming과 Tagging
-- Kiro CLI
 - Terraform 실무 운영
 
 이 주제들은 필수 Hands-on 범위에 추가하지 않습니다.
@@ -659,6 +738,7 @@ AMI Deregister만으로 EBS Snapshot은 삭제되지 않습니다. 개인 AWS Ac
 - Golden Image Builder User Data
 - AMI 생성 대기
 - Target Group Health 전환
+- Kiro CLI 최초 Device Flow 로그인
 - Cleanup
 
-교육 전 Role 생성 및 Remote-SSH를 사전 안내하고, 강사는 동일한 Ubuntu 24.04 Script를 리허설합니다. AMI 대기시간에는 Network Code를 설명하고 강사용 예비 Golden AMI를 준비합니다.
+교육 전 Role 생성 및 Remote-SSH를 사전 안내하고, 강사는 동일한 Ubuntu 24.04 Script와 Kiro CLI Device Flow 로그인을 리허설합니다. AMI 대기시간에는 Network Code를 설명하고 강사용 예비 Golden AMI를 준비합니다. Kiro 인증이 지연되면 분석/개선 Prompt는 Instructor-led 방식으로 빠르게 전환하되, 교육생 Hands-on을 기본 운영으로 합니다.
