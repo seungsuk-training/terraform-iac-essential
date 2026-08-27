@@ -669,7 +669,21 @@ AI가 새로운 untracked `.tf` 파일을 만들었다면 `git status --short`�
 
 ## Lab 6. Cleanup — 비용 방지 필수
 
-### 6-1. Terraform Cleanup
+### 6-1. Golden Image Builder 먼저 삭제
+
+Golden Image Builder EC2와 `WEB-SG`는 Terraform이 생성한 Custom VPC 안에 있지만 Terraform State 밖에서 수동으로 만들었습니다. 이 Resource가 남아 있으면 Terraform이 Subnet 또는 VPC를 삭제할 때 Dependency 오류가 발생할 수 있으므로 `terraform destroy`보다 먼저 정리합니다.
+
+AWS Console에서:
+
+1. EC2 → Instances → `terraform-iac-essential-image-builder` 선택
+2. Instance state → Terminate instance
+3. Instance 상태가 `Terminated`가 될 때까지 대기
+4. EC2 → Security Groups → `WEB-SG` 선택
+5. 연결된 Network Interface가 없는지 확인한 후 `WEB-SG` 삭제
+
+Golden AMI와 EBS Snapshot은 아직 삭제하지 않습니다. Terraform이 관리하는 Auto Scaling Group과 Web EC2가 Golden AMI를 사용하고 있으므로 Terraform Cleanup이 완료된 뒤 정리합니다.
+
+### 6-2. Terraform Cleanup
 
 Ubuntu Development EC2의 VS Code Terminal에서:
 
@@ -679,7 +693,7 @@ terraform plan -destroy
 terraform destroy
 ```
 
-AWS Console에서 확인합니다.
+AWS Console에서 삭제를 확인합니다.
 
 - Auto Scaling Group과 Web EC2
 - Launch Template
@@ -687,26 +701,26 @@ AWS Console에서 확인합니다.
 - Terraform Security Groups
 - VPC, Subnet, Route Table과 Internet Gateway
 
-### 6-2. Manual Cleanup
+Subnet 또는 VPC에서 Dependency 오류가 발생하면 Golden Image Builder가 완전히 Terminate되었는지, `WEB-SG` 또는 수동 Network Interface가 남아 있는지 확인합니다. 원인을 제거한 후 `terraform destroy`를 다시 실행합니다.
+
+### 6-3. 나머지 Manual Cleanup
 
 다음은 Terraform State 밖에서 만들었으므로 `terraform destroy`가 삭제하지 않습니다.
 
-- Golden Image Builder EC2 Terminate
 - Golden AMI Deregister
 - Golden AMI의 EBS Snapshot Delete
-- Image Builder용 `WEB-SG` Delete
 - Ubuntu Development EC2 Terminate
-- Development EC2 Security Group Delete
-- Development EC2 Key Pair Delete
+- Development EC2의 `Code-Server-SG` Delete
+- Development EC2 Key Pair `tfkey` Delete
 - `TerraformLabRole`과 Instance Profile Delete
 
 권장 순서:
 
-1. Terraform Destroy 완료
-2. Image Builder EC2/AMI/Snapshot/`WEB-SG` 삭제
+1. Golden AMI Deregister
+2. Golden AMI의 EBS Snapshot 삭제
 3. Development EC2에서 필요한 파일이 없는지 확인
 4. Development EC2 Terminate
-5. Development Security Group과 Key Pair 삭제
+5. `Code-Server-SG`와 `tfkey` 삭제
 6. IAM Role과 Instance Profile 삭제
 
 AWS Console에서 IAM → Roles → `TerraformLabRole`을 선택하여 삭제합니다. Development EC2를 먼저 Terminate하고 Instance Profile 연결이 해제된 뒤 진행합니다.
