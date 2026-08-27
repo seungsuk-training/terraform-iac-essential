@@ -724,3 +724,11 @@ Subnet 또는 VPC에서 Dependency 오류가 발생하면 Golden Image Builder�
 AWS Console에서 IAM → Roles → `TerraformLabRole`을 선택하여 삭제합니다. Development EC2를 먼저 Terminate하고 Instance Profile 연결이 해제된 뒤 진행합니다.
 
 AMI Deregister만으로 EBS Snapshot은 삭제되지 않습니다. 개인 AWS Account에 비용 발생 Resource가 남지 않았는지 EC2와 VPC Console에서 최종 확인합니다.
+
+## 실습을 마치며
+
+4시간 동안 Terraform으로 AWS Infrastructure를 직접 구성하고, 동작을 확인하고, 안전하게 정리하는 전 과정을 완료했습니다.
+
+마지막으로 Kiro CLI를 활용해 Terraform Code와 Architecture를 분석하며 AI-assisted IaC Workflow도 경험했습니다. AI의 제안을 그대로 적용하지 않고 `terraform validate`와 `terraform plan` 결과를 직접 검토하는 습관을 기억해 주세요.
+
+끝까지 실습에 참여해 주셔서 감사합니다. 수고 많으셨습니다!
