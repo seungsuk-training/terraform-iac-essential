@@ -434,10 +434,13 @@ EC2 → Instances → Launch instances:
 - Name: `terraform-iac-essential-image-builder`
 - AMI: Amazon Linux 2023, x86_64
 - Instance type: `t3.micro` 또는 교육용 소형 Type
+- Key pair: 기존 `tfkey` 선택
 - Network: `terraform-iac-essential-lab-vpc`
 - Subnet: Public Subnet C (`10.0.2.0/24`)
 - Auto-assign Public IP: Enable
-- 새 Security Group: HTTP 80 허용
+- 새 Security Group name: `WEB-SG`
+- Security Group rule 1: HTTP / TCP 80 / Source `Anywhere-IPv4` (`0.0.0.0/0`)
+- Security Group rule 2: SSH / TCP 22 / Source `My IP`
 - Advanced details → User data: `userdata/image-builder.sh` 내용 붙여넣기
 
 Public IPv4 주소를 Browser에서 열어 다음 값이 표시되는지 확인합니다.
@@ -450,6 +453,23 @@ Public IPv4 주소를 Browser에서 열어 다음 값이 표시되는지 확인�
 다운로드한 예제 앱에는 RDS 연결 화면도 포함되어 있지만, 이번 4시간 과정에서는 DB를 생성하거나 연결하지 않습니다. 이후 RDS 실습으로 확장할 때 활용할 수 있습니다.
 
 User Data는 AL2023의 기본 IMDSv2 요구사항에 맞춰 원본 앱의 Metadata 조회 파일을 교체합니다. `unzip`과 `curl` 설치, PHP-FPM 시작도 Script에 포함되어 있으므로 `userdata/image-builder.sh` 전체를 그대로 붙여넣습니다.
+
+Browser에서 페이지가 열리지 않거나 Metadata가 표시되지 않으면 `tfkey`로 Image Builder에 SSH 접속합니다. Amazon Linux 2023의 기본 User는 `ec2-user`입니다.
+
+```bash
+ssh -i ~/.ssh/tfkey.pem ec2-user@<Image-Builder-Public-IP>
+```
+
+접속 후 User Data 실행 상태와 Service를 확인합니다.
+
+```bash
+sudo cloud-init status --long
+sudo tail -n 100 /var/log/cloud-init-output.log
+sudo journalctl -u cloud-final --no-pager -n 100
+sudo systemctl status httpd php-fpm --no-pager
+```
+
+`cloud-init`이 아직 실행 중이면 완료될 때까지 기다립니다. SSH 접속이 Timeout이면 `WEB-SG`의 SSH Source가 현재 Local PC의 Public IP인지를 확인합니다. 진단을 위해 SSH Source를 `0.0.0.0/0`으로 열지 않습니다.
 
 Actions → Image and templates → Create image:
 
@@ -580,7 +600,7 @@ AWS Console에서 확인합니다.
 - Golden Image Builder EC2 Terminate
 - Golden AMI Deregister
 - Golden AMI의 EBS Snapshot Delete
-- Image Builder용 수동 Security Group Delete
+- Image Builder용 `WEB-SG` Delete
 - Ubuntu Development EC2 Terminate
 - Development EC2 Security Group Delete
 - Development EC2 Key Pair Delete
@@ -589,7 +609,7 @@ AWS Console에서 확인합니다.
 권장 순서:
 
 1. Terraform Destroy 완료
-2. Image Builder EC2/AMI/Snapshot/Security Group 삭제
+2. Image Builder EC2/AMI/Snapshot/`WEB-SG` 삭제
 3. Development EC2에서 필요한 파일이 없는지 확인
 4. Development EC2 Terminate
 5. Development Security Group과 Key Pair 삭제
