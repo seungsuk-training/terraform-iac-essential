@@ -2,6 +2,8 @@
 
 개인 노트북의 Visual Studio Code에서 Remote-SSH로 Ubuntu Development EC2에 접속하여 Terraform으로 AWS Highly Available Web Service를 구축하는 4시간 Hands-on 과정입니다. 마지막에는 교육생이 Kiro CLI로 자신이 구축한 Terraform Project를 분석하며 AI-assisted IaC Workflow를 직접 실습합니다.
 
+교육 교안: [Terraform IaC Essential Hands-on PDF](materials/terraform-iac-essential-handson.pdf)
+
 ## Course Flow
 
 ```text
