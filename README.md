@@ -15,11 +15,12 @@ Terraform / IaC 개요와 Architecture
 2교시
 GitHub Clone
 → Terraform Basics
-→ Golden AMI 준비
 → Custom VPC / Network
+→ Network 구축 및 확인
+→ Golden Image Builder 준비
 
 3교시
-Golden AMI 적용
+Golden AMI 생성 및 적용
 → Security Group
 → Launch Template
 → Auto Scaling Group
