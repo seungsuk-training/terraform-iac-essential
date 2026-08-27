@@ -1,335 +1,359 @@
 # Terraform IaC Essential Hands-on
 
-개인 노트북의 VS Code와 Local Terminal에서 Terraform으로 AWS Highly Available Web Service를 구축하고 Kiro CLI로 코드를 분석하는 4시간 Hands-on Lab입니다.
+개인 노트북의 Visual Studio Code에서 Remote-SSH로 Ubuntu Development EC2에 접속하여 Terraform으로 AWS Highly Available Web Service를 구축하는 4시간 Hands-on 과정입니다. 마지막에는 강사가 Kiro CLI로 AI-assisted IaC Workflow를 시연합니다.
 
-## Lab Overview
+## Course Flow
 
 ```text
-Terraform Code
-      ↓
-Custom VPC
-      ↓
-Public Subnet A/C: Internet-facing ALB
-      ↓
+1교시
+Terraform / IaC 개요와 Architecture
+→ Ubuntu Development EC2
+→ IAM Role 생성 및 연결
+→ VS Code Remote-SSH
+→ 개발환경 확인
+
+2교시
+GitHub Clone
+→ Terraform Basics
+→ Golden AMI 준비
+→ Custom VPC / Network
+
+3교시
+Golden AMI 적용
+→ Security Group
+→ Launch Template
+→ Auto Scaling Group
+→ Target Group
+
+4교시
+Application Load Balancer
+→ Web Service Verification
+→ Kiro CLI Instructor Demo
+→ Cleanup
+
+5교시
+Optional Q&A (희망자, 1시간)
+```
+
+> Terraform을 실행하기 전에 Infrastructure as Code 개발환경을 먼저 구성합니다. 이번 과정에서는 교육생의 Local OS 차이를 최소화하고 동일한 Linux 환경을 제공하기 위해 AWS Ubuntu EC2를 Terraform Development Environment로 사용합니다.
+
+## Final Architecture
+
+```text
+교육생 PC
+Windows / macOS / Ubuntu
+        │
+        │ VS Code Remote-SSH
+        ▼
+Ubuntu Development EC2
+        │
+        ├── Git / Terraform / AWS CLI
+        └── TerraformLabRole의 Temporary Credential
+                         │
+                         ▼
+                       AWS API
+
+Internet
+   ↓
+Internet-facing ALB — Public Subnet A/C
+   ↓
 Target Group
-      ↓
-Private Subnet A/C: Golden AMI 기반 Auto Scaling Web EC2
-      ↓
-ALB DNS로 Web Service 확인
-      ↓
-Kiro CLI AI-assisted IaC
+   ↓
+Auto Scaling Web EC2 — Private Subnet A/C
+   ↑
+Golden AMI
 ```
 
 Region은 `ap-northeast-2`, VPC는 `10.0.0.0/16`입니다. Public Subnet은 `10.0.0.0/24`, `10.0.2.0/24`, Private Subnet은 `10.0.1.0/24`, `10.0.3.0/24`입니다.
 
-Golden AMI에 Web Server와 Application을 포함하므로 Private EC2의 Internet Outbound가 필요하지 않습니다. 따라서 NAT Gateway를 구성하지 않습니다. 실제 환경에서는 요구사항에 따라 NAT Gateway나 VPC Endpoint를 검토해야 합니다. RDS, Bastion, Module, Remote Backend와 CI/CD도 4시간 범위에서 제외합니다.
+이번 Lab에서는 Golden AMI로 Private Web Instance의 Runtime Internet 의존성을 제거했기 때문에 교육 범위와 비용을 고려하여 NAT Gateway를 제외합니다. Private Subnet에 NAT Gateway가 항상 불필요하다는 뜻은 아닙니다. 실제 환경에서는 Package Update, 외부 API와 운영 요구사항에 따라 NAT Gateway 또는 VPC Endpoint를 검토합니다. RDS, Module, Remote Backend와 CI/CD도 이번 과정에서 제외합니다.
 
-> 기본 Workflow: Read → Modify → `fmt` → `validate` → `plan` → Human Review → `apply` → Verify
+## Lab 1. Development Environment
 
-## 0. 교육 전 준비
-
-환경 구성, IAM, Kiro CLI도 본 과정의 필수 범위입니다. 교육 당일 시간을 확보하려면 가능하면 사전에 완료합니다.
-
-지원 환경:
-
-- Windows 11: PowerShell 또는 Windows Terminal에서 Native CLI 사용
-- Windows 10: Kiro CLI 필수 실습을 위해 WSL2 Ubuntu 사용
-- macOS
-- Ubuntu Linux
-
-필수 도구:
-
-1. Visual Studio Code
-2. Git
-3. Terraform CLI
-4. AWS CLI v2
-5. Kiro CLI
-6. VS Code의 HashiCorp Terraform Extension 권장
-
-### 0-1. Windows 11
-
-다음 공식 Installer를 사용합니다.
-
-- [Visual Studio Code](https://code.visualstudio.com/download): User Installer 실행
-- [Git for Windows](https://git-scm.com/install/windows): Installer 실행
-- [Terraform CLI](https://developer.hashicorp.com/terraform/install): Windows AMD64 ZIP 압축을 풀고 `terraform.exe`가 있는 Directory를 사용자 `Path`에 추가
-- [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html): Windows MSI Installer 실행
-- [Kiro CLI](https://kiro.dev/docs/cli/): Windows 항목을 선택하여 현재 공식 PowerShell 설치 절차 실행
-
-설치 후 새 PowerShell을 열어 확인합니다.
-
-```powershell
-git --version
-terraform version
-aws --version
-kiro-cli --version
-```
-
-명령을 찾지 못하면 Terminal을 완전히 닫았다가 다시 열고 Installer의 `Add to PATH` 또는 Windows 환경 변수 `Path` 설정을 확인합니다.
-
-### 0-2. Windows 10
-
-Kiro CLI는 현재 Windows 11을 Native 지원합니다. Windows 10에서는 [WSL 설치 안내](https://learn.microsoft.com/windows/wsl/install)에 따라 WSL2와 Ubuntu를 설치하고, 이후 Git/Terraform/AWS CLI/Kiro CLI 명령은 모두 Ubuntu Terminal 안에서 실행합니다.
-
-관리자 PowerShell에서:
-
-```powershell
-wsl --install -d Ubuntu
-```
-
-재부팅 후 Ubuntu Terminal을 열고 아래의 `0-4. Ubuntu Linux` 중 CLI 설치 절차를 따릅니다. Linux용 VS Code `.deb`는 WSL 안에 설치하지 않습니다. VS Code에는 `WSL` Extension과 `HashiCorp Terraform` Extension을 설치합니다. Repository를 WSL Home Directory에 Clone한 뒤 WSL Terminal에서 `code .`를 실행하거나 VS Code의 `WSL: Open Folder in WSL`을 사용합니다.
-
-> Windows 10에서 WSL2를 처음 설치하는 과정은 재부팅이 필요할 수 있으므로 반드시 교육 전에 완료합니다.
-
-### 0-3. macOS
-
-- [Visual Studio Code](https://code.visualstudio.com/docs/setup/mac): DMG를 열고 Applications로 이동
-- [Git](https://git-scm.com/install/mac): 공식 안내에 따라 설치
-- [Homebrew](https://brew.sh/)가 있다면 Terraform을 다음과 같이 설치
-
-```bash
-brew tap hashicorp/tap
-brew install hashicorp/tap/terraform
-```
-
-AWS CLI v2와 Kiro CLI는 공식 설치 스크립트를 사용합니다.
-
-```bash
-curl -fsSL https://awscli.amazonaws.com/v2/install.sh | bash
-curl -fsSL https://cli.kiro.dev/install | bash
-```
-
-새 Terminal을 열고 확인합니다.
-
-```bash
-git --version
-terraform version
-aws --version
-kiro-cli --version
-```
-
-`aws` 또는 `kiro-cli`를 찾지 못하면 `export PATH="$HOME/.local/bin:$PATH"`를 `~/.zshrc`에 추가하고 새 Terminal을 엽니다.
-
-macOS에서 `code` 명령이 필요하면 VS Code의 Command Palette에서 `Shell Command: Install 'code' command in PATH`를 실행합니다. 이 설정이 없어도 VS Code GUI의 `File → Open Folder`로 실습할 수 있습니다.
-
-### 0-4. Ubuntu Linux
-
-VS Code는 [공식 Linux 설치 안내](https://code.visualstudio.com/docs/setup/linux)에 따라 `.deb` Package를 설치합니다. Git과 설치 도구를 준비합니다.
-
-```bash
-sudo apt update
-sudo apt install -y git curl wget gpg unzip
-```
-
-HashiCorp 공식 APT Repository에서 Terraform을 설치합니다.
-
-```bash
-wget -O - https://apt.releases.hashicorp.com/gpg |
-  sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(. /etc/os-release && echo "$VERSION_CODENAME") main" |
-  sudo tee /etc/apt/sources.list.d/hashicorp.list
-
-sudo apt update
-sudo apt install -y terraform
-```
-
-AWS CLI v2와 Kiro CLI를 설치합니다.
-
-```bash
-curl -fsSL https://awscli.amazonaws.com/v2/install.sh | bash
-curl -fsSL https://cli.kiro.dev/install | bash
-```
-
-새 Terminal을 열고 확인합니다.
-
-```bash
-git --version
-terraform version
-aws --version
-kiro-cli --version
-```
-
-`aws` 또는 `kiro-cli`를 찾지 못하면 다음을 실행하고 새 Terminal을 엽니다.
-
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-### 0-5. VS Code Extension
-
-VS Code → Extensions (`Ctrl+Shift+X` 또는 macOS `Cmd+Shift+X`)에서 `HashiCorp Terraform`을 검색하여 Publisher가 HashiCorp인지 확인하고 설치합니다. Terraform Syntax Highlighting, Formatting과 기본 오류 확인에 도움을 줍니다.
-
-## 1. AWS IAM 실습 사용자 준비
-
-### 1-1. Root User 사용 원칙
-
-> AWS Root User는 계정 수준의 관리 작업에만 사용하고, Terraform과 AWS CLI에서 Root Access Key를 사용하지 않습니다.
-
-Root User로 처음 로그인하여 `tf-user`를 만든 뒤 즉시 로그아웃합니다. Root Access Key는 과정 전체에서 생성하지 않습니다. Root User에는 MFA 설정을 권장합니다.
-
-### 1-2. `tf-user`와 Console Access 생성
-
-Root User로 AWS Console에 로그인한 뒤:
-
-1. IAM → Users → Create user
-2. User name에 `tf-user` 입력
-3. `Provide user access to the AWS Management Console` 선택
-4. `I want to create an IAM user` 선택
-5. Console Password를 자동 생성하거나 강사가 안내한 규칙으로 설정
-6. 필요에 따라 `User must create a new password at next sign-in` 선택
-7. Permissions에서 `Attach policies directly` 선택
-8. AWS Managed Policy `AdministratorAccess` 선택
-9. Review 후 Create user
-10. Console Sign-in URL, User name과 초기 Password를 안전한 곳에 보관
-
-> 이번 과정에서는 제한된 시간 동안 개인 실습 계정에서 Terraform의 여러 AWS Resource를 생성하기 위해 `AdministratorAccess`를 사용합니다. 실제 운영 환경에서는 필요한 작업에 맞는 최소 권한(Least Privilege)을 적용해야 합니다.
-
-Root User에서 로그아웃한 뒤 IAM User Sign-in URL을 열어 `tf-user`로 로그인합니다. Account ID, 실제 Password 또는 Sign-in URL을 Repository에 기록하지 않습니다.
-
-### 1-3. `tf-user` Access Key 생성
-
-`tf-user`로 Console에 로그인한 상태에서:
-
-1. 우측 상단 User menu → Security credentials 또는 IAM → Users → `tf-user`
-2. Security credentials Tab → Access keys → Create access key
-3. Use case에서 `Command Line Interface (CLI)` 선택
-4. 보안 권고를 확인하고 Create access key
-5. Access Key ID와 Secret Access Key를 안전하게 보관하거나 CSV Download
-
-Secret Access Key는 이 화면에서만 확인할 수 있습니다.
-
-- Root User Access Key를 만들지 않습니다.
-- Access Key를 `.tf`, `.tfvars`, README, Source Code에 입력하지 않습니다.
-- Access Key/Secret Key, `.aws/credentials`를 GitHub에 Commit하지 않습니다.
-- Key가 노출되었다면 즉시 비활성화 또는 삭제하고 새 Key를 생성합니다.
-
-## 2. Local AWS CLI Credential 설정
-
-VS Code의 Local Terminal 또는 OS Terminal에서 실행합니다.
-
-```bash
-aws configure
-```
-
-Windows PowerShell에서도 동일한 명령입니다.
+1교시 종료 목표:
 
 ```text
-AWS Access Key ID: <tf-user Access Key>
-AWS Secret Access Key: <tf-user Secret Access Key>
-Default region name: ap-northeast-2
-Default output format: json
+Local PC
+   │
+VS Code + Remote-SSH
+   ▼
+Ubuntu Development EC2
+   ├── Git        OK
+   ├── Terraform  OK
+   ├── AWS CLI    OK
+   └── IAM Role   OK
 ```
 
-AWS CLI는 기본 Profile의 Credential을 사용자 Home의 `.aws/credentials`에, Region과 Output 설정을 `.aws/config`에 저장합니다. 이 파일을 프로젝트로 복사하거나 Git에 추가하지 않습니다.
+### 1-1. Visual Studio Code
 
-인증을 확인합니다.
+교육생 PC에 [Visual Studio Code](https://code.visualstudio.com/download)를 설치합니다. Windows 10/11, macOS와 Ubuntu Linux의 자세한 설치 과정은 공식 페이지를 따릅니다.
+
+VS Code → Extensions에서 설치합니다.
+
+필수:
+
+- `Remote - SSH` — Publisher: Microsoft
+
+권장:
+
+- `HashiCorp Terraform` — Publisher: HashiCorp
+
+Terraform, Git과 AWS CLI는 Local PC에 설치하지 않아도 됩니다. 해당 CLI는 Ubuntu Development EC2에서 실행합니다.
+
+### 1-2. Ubuntu Development EC2 생성
+
+먼저 AWS Console에서 Terraform 개발환경으로 사용할 EC2를 생성합니다.
+
+AWS Console → EC2 → Instances → Launch instances:
+
+- Name: `terraform-iac-essential-dev`
+- AMI: `Ubuntu Server 24.04 LTS`
+- Architecture: x86_64 권장
+- Instance type: 자신의 계정과 현재 AWS Free Tier 정책에서 사용 가능한 소형 Type
+- Key pair: 새 Key Pair 생성 후 Private Key 다운로드
+- Public IPv4: Enabled
+- Security Group: SSH / TCP 22 / Source `My IP`
+- Advanced details → IAM instance profile: 이 단계에서는 선택하지 않아도 됨
+
+특정 Instance Type이 항상 Free Tier라고 가정하지 않습니다. Launch 전에 자신의 계정에서 표시되는 Free Tier 또는 예상 비용을 확인합니다.
+
+Development EC2는 Terraform으로 생성하지 않습니다.
+
+```text
+Development EC2
+→ Terraform을 실행하는 개발환경
+
+Golden Image Builder EC2
+→ Web Server용 Golden AMI를 만드는 서버
+
+Private Web EC2
+→ Launch Template + Auto Scaling Group이 만드는 실제 Web Server
+```
+
+Instance가 `Running` 상태가 되고 Status checks가 통과할 때까지 기다립니다. Public IPv4 주소와 사용한 Key Pair 이름을 기록합니다.
+
+### 1-3. `TerraformLabRole` 생성과 EC2 연결
+
+교육생 OS와 관계없이 동일하게 진행할 수 있도록 Role 생성과 연결은 모두 AWS Management Console에서 수행합니다.
+
+Development EC2에서는 Access Key를 사용하지 않고 EC2 IAM Role의 Temporary Credential을 사용합니다.
+
+다음 작업은 하지 않습니다.
+
+- AWS Account Root Access Key 생성
+- IAM User Access Key 생성
+- `aws configure`
+- Access Key를 Terraform Source나 Git에 저장
+
+#### Role 생성
+
+AWS Console에서:
+
+1. IAM → Roles → Create role
+2. Trusted entity type: `AWS service`
+3. Use case: `EC2`
+4. Permissions에서 `AdministratorAccess` 선택
+5. Role name: `TerraformLabRole`
+6. Review 후 Create role
+
+EC2 Use Case로 Role을 생성하면 EC2에 연결할 Instance Profile도 함께 준비됩니다.
+
+> 이번 과정에서는 제한된 시간 동안 개인 실습 계정에서 여러 AWS Resource를 생성하고 삭제하기 위해 교육 편의상 넓은 권한을 사용합니다. 실제 운영 환경에서는 필요한 작업에 맞는 최소 권한(Least Privilege)을 적용해야 합니다.
+
+#### 실행 중인 Development EC2에 Role 연결
+
+1. EC2 → Instances
+2. `terraform-iac-essential-dev` 선택
+3. Actions → Security → Modify IAM role
+4. IAM role에서 `TerraformLabRole` 선택
+5. Update IAM role
+6. Instance Summary의 IAM Role 항목에서 연결 확인
+
+Role이 목록에 바로 나타나지 않으면 IAM Role 생성 완료를 확인하고 잠시 후 새로고침합니다.
+
+```text
+Ubuntu Development EC2
+→ TerraformLabRole Instance Profile
+→ Temporary Credential
+→ AWS API
+```
+
+### 1-4. VS Code Remote-SSH 연결
+
+Private Key는 안전하게 보관하고 Git이나 공유 Folder에 넣지 않습니다.
+
+macOS/Linux:
 
 ```bash
+chmod 400 <다운로드한-key>.pem
+ssh -i <다운로드한-key>.pem ubuntu@<Development-EC2-Public-IP>
+```
+
+Windows에서는 Private Key를 사용자 `.ssh` Directory에 두고 VS Code에서 해당 절대 경로를 선택합니다.
+
+VS Code에서:
+
+1. Command Palette (`F1` 또는 `Ctrl/Cmd+Shift+P`)
+2. `Remote-SSH: Add New SSH Host`
+3. 다음 형식 입력
+
+```text
+ssh -i <Private-Key-절대경로> ubuntu@<Development-EC2-Public-IP>
+```
+
+4. SSH Configuration File 선택
+5. `Remote-SSH: Connect to Host`
+6. 처음 접속 시 Host Fingerprint 확인 후 Linux 선택
+
+SSH Config 예:
+
+```sshconfig
+Host terraform-lab
+  HostName <Development-EC2-Public-IP>
+  User ubuntu
+  IdentityFile <Private-Key-절대경로>
+```
+
+VS Code 좌측 하단에 `SSH: terraform-lab`이 표시되면 성공입니다.
+
+Troubleshooting:
+
+- Timeout: Development EC2가 Running인지, Public IP와 Security Group SSH Source가 현재 `My IP`인지 확인
+- `Permission denied (publickey)`: User가 `ubuntu`인지, 선택한 Key가 Instance의 Key Pair와 일치하는지 확인
+- Private Key Permission 오류: Key를 본인만 읽을 수 있는 `.ssh` 위치에 두고 권한 확인
+
+### 1-5. Repository Clone과 환경 자동화
+
+Remote-SSH로 연결한 VS Code에서 Terminal → New Terminal을 엽니다. 이 Terminal은 Local PC가 아니라 Ubuntu Development EC2에서 실행됩니다.
+
+Git이 없다면 먼저 설치합니다.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git
+```
+
+Public Repository를 Clone합니다.
+
+```bash
+cd /home/ubuntu
+git clone https://github.com/seungsuk-training/terraform-iac-essential.git
+cd terraform-iac-essential
+```
+
+Public Repository이므로 GitHub Login, PAT 또는 SSH Key가 필요하지 않습니다.
+
+환경 설정 Script를 실행합니다.
+
+```bash
+bash scripts/setup-dev-environment.sh
+```
+
+Script는 Ubuntu 24.04에서 다음을 수행합니다.
+
+- Git과 기본 설치 도구 확인
+- HashiCorp 공식 APT Repository 구성
+- Terraform 설치
+- AWS 공식 Installer로 AWS CLI v2 설치
+- Version 출력
+
+반복 실행해도 기존 Repository와 설치를 재사용하도록 구성했습니다.
+
+VS Code에서 `File → Open Folder`를 선택하고 다음 Remote Directory를 엽니다.
+
+```text
+/home/ubuntu/terraform-iac-essential
+```
+
+Remote 환경에도 HashiCorp Terraform Extension 설치를 권장합니다.
+
+### 1-6. Development Environment Checkpoint
+
+VS Code Remote Terminal에서:
+
+```bash
+git --version
+terraform version
+aws --version
 aws sts get-caller-identity
 ```
 
 성공 조건:
 
-- 자신의 AWS Account ID가 출력됨
-- ARN이 `user/tf-user`를 포함함
-- `InvalidClientTokenId`, `SignatureDoesNotMatch`, `AccessDenied`가 없음
-
-## 3. 개발환경 준비 Checkpoint
-
-다음이 모두 성공해야 Terraform Lab으로 이동합니다.
-
-```bash
-git --version
-terraform version
-aws --version
-aws sts get-caller-identity
-kiro-cli --version
-```
+- Git/Terraform/AWS CLI Version 출력
+- Account가 자신의 실습 AWS Account
+- ARN에 `assumed-role/TerraformLabRole` 포함
 
 ```text
-VS Code          OK
-Git              OK
-Terraform        OK
-AWS CLI          OK
-AWS Credential   OK (tf-user)
-Kiro CLI         OK
+Terraform
+   ↓
+AWS Provider
+   ↓
+EC2 IAM Role Temporary Credential
+   ↓
+AWS API
 ```
 
-Kiro 로그인도 미리 완료합니다.
+EC2 Metadata Service가 Temporary Credential을 제공하므로 `aws configure`가 필요하지 않습니다. Access Key를 직접 저장하지 않아도 AWS CLI와 Terraform AWS Provider가 같은 Role Credential을 자동으로 사용합니다.
 
-```bash
-kiro-cli login
-kiro-cli whoami
-```
+Role이 바로 보이지 않으면 1~2분 후 다시 실행하고 EC2 → Actions → Security → Modify IAM role에서 `TerraformLabRole` 연결을 확인합니다.
 
-Browser 인증 화면에서 Builder ID, GitHub, Google 또는 교육에서 지정한 조직 계정을 사용합니다. Kiro 인증과 AWS `tf-user` Credential은 서로 다른 인증입니다.
+## Lab 2. Terraform Basics와 Network
 
-## 4. Repository Clone과 VS Code
-
-Public Repository이므로 Clone에 GitHub Account나 Credential이 필요하지 않습니다.
-
-```bash
-git clone https://github.com/seungsuk-training/terraform-iac-essential.git
-cd terraform-iac-essential
-```
-
-VS Code에서 엽니다.
-
-```bash
-code .
-```
-
-`code` 명령이 없으면 VS Code GUI에서 `File → Open Folder`를 선택하고 `terraform-iac-essential` Directory를 엽니다.
-
-구조:
+전체 Source를 직접 입력하지 않습니다.
 
 ```text
-terraform-iac-essential/
-├── README.md
-├── userdata/
-│   └── image-builder.sh
-├── terraform/
-│   ├── versions.tf
-│   ├── providers.tf
-│   ├── variables.tf
-│   ├── terraform.tfvars
-│   ├── vpc.tf
-│   ├── security_groups.tf
-│   ├── asg.tf
-│   ├── load_balancer.tf
-│   └── outputs.tf
-└── ai/
-    └── prompts.md
+Architecture 설명
+→ VS Code에서 관련 .tf 파일 확인
+→ 중요한 Resource/Reference 설명
+→ terraform plan
+→ Human Review
+→ terraform apply
+→ AWS Console 확인
 ```
 
-## 5. Terraform Workflow와 Network Bootstrap
-
-VS Code에서 `terraform/`의 `.tf` 파일을 읽습니다. 전체 코드를 직접 입력하지 않고 제공 코드를 Read → Modify → Plan → Apply → Verify합니다.
+Terraform Working Directory로 이동합니다.
 
 ```bash
-cd terraform
+cd /home/ubuntu/terraform-iac-essential/terraform
 terraform init
 terraform fmt
 terraform validate
 ```
 
 - `init`: AWS Provider를 내려받고 Working Directory 초기화
-- `fmt`: Terraform 표준 형식으로 코드 정렬
-- `validate`: 문법과 Resource Reference의 정적 오류 검사
-- `plan`: AWS에 적용될 생성/변경/삭제를 미리 계산하여 사람이 검토
-- `apply`: 검토한 변경을 실제 AWS에 적용
+- `fmt`: Terraform 표준 형식으로 HCL 정렬
+- `validate`: Syntax와 Resource Reference의 정적 오류 검사
+- `plan`: 실제 Infrastructure 변경을 계산하여 사람이 검토
+- `apply`: 검토한 Plan을 AWS에 적용
 
-특히 다음 참조를 찾습니다.
+```text
+Write / Read
+    ↓
+terraform fmt
+    ↓
+terraform validate
+    ↓
+terraform plan
+    ↓
+Human Review
+    ↓
+terraform apply
+    ↓
+Verify
+```
+
+코드에서 다음 Reference를 확인합니다.
 
 ```hcl
 vpc_id = aws_vpc.main.id
 ```
 
-이 Reference로 Terraform은 VPC를 먼저 만든 뒤 그 ID를 Subnet, Security Group과 Target Group에 전달하는 Implicit Dependency를 구성합니다.
+Terraform은 Resource Reference를 통해 VPC가 먼저 필요하다는 Implicit Dependency를 이해합니다.
 
-Golden AMI Image Builder를 실습 VPC의 Public Subnet에 배치하기 위해 최초 한 번만 Network를 Bootstrap합니다.
+### 2-1. Network Bootstrap
+
+Golden Image Builder를 실습 VPC의 Public Subnet에 배치하기 위해 최초 한 번만 Network를 생성합니다.
 
 ```bash
 terraform plan \
@@ -355,106 +379,124 @@ terraform apply \
   -target=aws_route_table_association.pub_c
 ```
 
-`-target`은 일반 Workflow가 아니라 Golden AMI 제작을 위한 일회성 Bootstrap입니다. 이후에는 전체 `terraform plan/apply`를 사용합니다.
+`-target`은 일반 배포 방식이 아니라 Golden AMI 제작을 위한 일회성 Bootstrap입니다. 이후에는 전체 `terraform plan/apply`를 사용합니다.
 
-AWS Console의 VPC → Your VPCs/Subnets/Route tables에서 VPC, Subnet 4개와 Public Route `0.0.0.0/0 → igw-...`를 확인합니다. Private Subnet에는 Default Route가 없어야 합니다.
+AWS Console의 VPC → Your VPCs/Subnets/Route tables에서 확인합니다.
 
-## 6. Golden AMI 생성
+- VPC: `10.0.0.0/16`
+- Public/Private Subnet 각 2개
+- Public Route: `0.0.0.0/0 → Internet Gateway`
+- Private Subnet: Default Route 없음
 
-Golden Image Builder EC2는 Terraform으로 만들지 않습니다. `tf-user`로 로그인한 AWS Console에서 진행합니다.
+## Lab 3. Golden AMI
+
+Golden Image Builder EC2는 Terraform으로 만들지 않습니다.
+
+```text
+AWS Console
+→ Public Subnet C
+→ Golden Image Builder EC2
+→ userdata/image-builder.sh
+→ Web Server 확인
+→ AMI 생성
+→ Golden AMI ID
+→ terraform.tfvars 수정
+```
 
 EC2 → Instances → Launch instances:
 
 - Name: `terraform-iac-essential-image-builder`
 - AMI: Amazon Linux 2023, x86_64
-- Instance type: `t3.micro`
+- Instance type: `t3.micro` 또는 교육용 소형 Type
 - Network: `terraform-iac-essential-lab-vpc`
 - Subnet: Public Subnet C (`10.0.2.0/24`)
 - Auto-assign Public IP: Enable
 - 새 Security Group: HTTP 80 허용
-- Advanced details → User data: `userdata/image-builder.sh` 전체 내용 붙여넣기
+- Advanced details → User data: `userdata/image-builder.sh` 내용 붙여넣기
 
-Instance가 Running이 된 뒤 Public IPv4 주소를 Browser에서 열어 `Terraform IaC Essential`을 확인합니다. 실패하면 Status checks, Public IP, Security Group 80과 `/var/log/cloud-init-output.log`를 확인합니다.
+Public IPv4 주소를 Browser에서 열어 `Terraform IaC Essential`을 확인합니다.
 
-Image Builder를 선택하고 Actions → Image and templates → Create image:
+Actions → Image and templates → Create image:
 
 - Image name: `terraform-iac-essential-golden-<YYYYMMDD-HHMM>`
 - Tags: `Project=terraform-iac-essential`, `Environment=lab`, `Purpose=GoldenImage`, `BuiltBy=Manual`
 
-EC2 → AMIs에서 상태가 `Available`이 되면 AMI ID를 복사합니다. VS Code에서 `terraform/terraform.tfvars`를 수정합니다.
+AMI 상태가 `Available`이 되면 VS Code에서 `terraform/terraform.tfvars`를 수정합니다.
 
 ```hcl
 golden_ami_id = "ami-xxxxxxxxxxxxxxxxx"
 ```
 
-AMI ID와 필요 시 `project_name`만 교육생이 수정합니다. Access Key나 Secret Key를 이 파일에 넣지 않습니다.
+Access Key나 Secret Key를 Terraform 파일에 넣지 않습니다.
 
-## 7. Private Web Infrastructure와 ALB 구축
+> Golden Image Builder의 User Data 실행 또는 AMI 생성 대기시간에는 Network Terraform Code와 Resource Reference를 설명하여 대기시간을 활용합니다.
 
-VS Code에서 다음 관계를 확인합니다.
+## Lab 4. Private Web Infrastructure와 ALB
+
+Source에서 다음 관계를 확인합니다.
 
 ```text
-Internet → ALB Security Group
-         → Web Security Group
-         → Private Web EC2
+Internet
+   ↓
+Application Load Balancer — Public Subnet A/C
+   ↓
+Target Group
+   ↓
+Web Auto Scaling Group — Private Subnet A/C
 ```
 
-- `security_groups.tf`: Web HTTP Source가 `aws_security_group.alb.id`
-- `asg.tf`: Golden AMI Launch Template, Public IP 없음, Private Subnet A/C, desired/min 2, max 4
-- `load_balancer.tf`: Public Subnet A/C, Internet-facing ALB, HTTP 80 Listener, `/` Health Check
-- ASG의 `target_group_arns`: Web EC2를 Target Group에 등록
+ALB는 Public Entry Point, Load Distribution, Health Check와 Multi-AZ High Availability를 제공합니다. Web EC2는 Public IP 없이 Private Subnet에 배치되고 ALB Security Group에서 오는 HTTP만 허용합니다.
 
-Workflow를 실행합니다.
+확인할 파일:
+
+- `security_groups.tf`: ALB SG → Web SG
+- `asg.tf`: Golden AMI Launch Template, Public IP 없음, Private Subnet A/C, desired/min 2, max 4
+- `load_balancer.tf`: Public Subnet A/C, Internet-facing ALB, HTTP Listener, `/` Health Check
+- `outputs.tf`: ALB DNS와 URL
 
 ```bash
+cd /home/ubuntu/terraform-iac-essential/terraform
 terraform fmt
 terraform validate
 terraform plan -out=tfplan
 terraform apply tfplan
 ```
 
-Plan은 실행을 위한 형식적 단계가 아닙니다. 생성, 변경, 교체, 삭제가 요구사항과 일치하는지 사람이 확인한 뒤 Apply합니다.
+Plan은 형식적인 단계가 아닙니다. 생성, 변경, 교체와 삭제가 요구사항에 맞는지 사람이 확인한 뒤 Apply합니다.
 
-AWS Console에서 확인합니다.
+AWS Console에서:
 
-- EC2 → Instances: Web EC2 두 대, Public IPv4 없음
-- EC2 → Auto Scaling Groups: Desired 2
-- EC2 → Target Groups → Targets: 두 Target이 Healthy
-- EC2 → Load Balancers: 두 Public Subnet과 HTTP Listener
+- EC2 Instances: Web EC2 두 대, Public IPv4 없음
+- Auto Scaling Groups: Desired 2
+- Target Groups: 두 Target이 Healthy
+- Load Balancers: Public Subnet 두 개와 HTTP Listener
 
 ```bash
 terraform output
 terraform output -raw alb_url
 ```
 
-출력 URL을 Browser에서 열어 Web Page가 표시되면 Infrastructure Lab 성공입니다.
+URL을 Browser에서 열어 Web Page가 표시되면 Infrastructure Lab 성공입니다.
 
-## 8. Kiro CLI 필수 AI-assisted IaC Lab
+## Lab 5. Kiro CLI Instructor Demo
 
-Infrastructure 완성 후 Repository Root에서 Kiro CLI를 실행합니다.
+Kiro CLI는 교육생 필수 설치 도구가 아닙니다. 다양한 Local OS와 4시간 제한을 고려하여 강사의 검증된 환경에서 과정 마지막 공식 Module로 진행합니다.
 
-```bash
-cd ..
-kiro-cli
-```
-
-[`ai/prompts.md`](ai/prompts.md)의 Prompt를 순서대로 사용합니다.
+강사는 [`ai/prompts.md`](ai/prompts.md)의 Scenario를 사용합니다.
 
 ```text
-Terraform Architecture 완성
-→ Kiro CLI 실행
-→ 현재 Project 분석
-→ AI 개선안 제안
-→ Human Review
-→ 필요한 작은 변경
+현재 Architecture 분석
+→ Resource Dependency 설명
+→ 개선점 제안
+→ Subnet map(object) + for_each Refactoring
+→ git diff
 → terraform fmt
 → terraform validate
 → terraform plan
 → Human Verification
-→ terraform apply
 ```
 
-AI가 만든 코드를 바로 Apply하지 않습니다.
+AI가 생성한 Infrastructure Code를 바로 Apply하지 않습니다.
 
 ```text
 Human
@@ -472,57 +514,83 @@ Human Verification
 terraform apply
 ```
 
-> AI는 Terraform과 Architecture를 대신 이해해 주는 도구가 아닙니다. Terraform과 Architecture를 이해한 사람이 AI를 활용하면 코드 생성, 분석, Refactoring 및 검증을 더 빠르게 수행할 수 있습니다.
+> AI가 Terraform과 Architecture를 대신 이해해 주는 것이 아닙니다. Terraform과 Architecture를 이해한 사람이 AI를 활용하면 코드 생성, 분석, Refactoring 및 검증을 더 빠르게 수행할 수 있습니다.
 
-## 9. Cleanup — 비용 방지 필수
+> AI가 생성하거나 수정한 Infrastructure Code를 바로 적용하지 않고 `terraform validate`와 `terraform plan` 결과를 사람이 검토합니다.
 
-Terraform Working Directory에서 먼저 Plan을 검토하고 Terraform 관리 Resource를 삭제합니다.
+## Lab 6. Cleanup — 비용 방지 필수
+
+### 6-1. Terraform Cleanup
+
+Ubuntu Development EC2의 VS Code Terminal에서:
 
 ```bash
-cd terraform
+cd /home/ubuntu/terraform-iac-essential/terraform
 terraform plan -destroy
 terraform destroy
 ```
 
-Console에서 EC2, Auto Scaling Group, Launch Template, ALB, Target Group, Security Group, VPC 관련 Resource가 삭제됐는지 확인합니다.
+AWS Console에서 확인합니다.
 
-다음 수동 Resource는 Terraform State 밖에 있으므로 `terraform destroy`가 삭제하지 않습니다.
+- Auto Scaling Group과 Web EC2
+- Launch Template
+- ALB와 Target Group
+- Terraform Security Groups
+- VPC, Subnet, Route Table과 Internet Gateway
 
-1. EC2 → Instances: Image Builder EC2 Terminate
-2. EC2 → AMIs: Golden AMI Deregister
-3. EC2 → Snapshots: 해당 AMI의 EBS Snapshot Delete
-4. Image Builder용 수동 Security Group Delete
+### 6-2. Manual Cleanup
 
-AMI Deregister만으로 EBS Snapshot은 삭제되지 않아 비용이 남을 수 있습니다.
+다음은 Terraform State 밖에서 만들었으므로 `terraform destroy`가 삭제하지 않습니다.
 
-## 10. 교육 종료 후 Credential 정리
+- Golden Image Builder EC2 Terminate
+- Golden AMI Deregister
+- Golden AMI의 EBS Snapshot Delete
+- Image Builder용 수동 Security Group Delete
+- Ubuntu Development EC2 Terminate
+- Development EC2 Security Group Delete
+- Development EC2 Key Pair Delete
+- `TerraformLabRole`과 Instance Profile Delete
 
-개인 실습 계정에서 Access Key가 더 필요하지 않다면 IAM → Users → `tf-user` → Security credentials에서 Access Key를 Deactivate 또는 Delete합니다. `tf-user` 자체가 필요 없다면 수동 Resource와 비용 발생 Resource가 모두 제거됐는지 확인한 뒤 User도 삭제할 수 있습니다.
+권장 순서:
 
-장기간 사용하는 개인 AWS 계정에서는 장기 Access Key보다 임시 Credential과 Least Privilege 구성을 별도로 검토합니다. Root Access Key는 만들지 않습니다.
+1. Terraform Destroy 완료
+2. Image Builder EC2/AMI/Snapshot/Security Group 삭제
+3. Development EC2에서 필요한 파일이 없는지 확인
+4. Development EC2 Terminate
+5. Development Security Group과 Key Pair 삭제
+6. IAM Role과 Instance Profile 삭제
 
-## 4시간 진행 Checkpoint
+AWS Console에서 IAM → Roles → `TerraformLabRole`을 선택하여 삭제합니다. Development EC2를 먼저 Terminate하고 Instance Profile 연결이 해제된 뒤 진행합니다.
 
-권장 시간:
+AMI Deregister만으로 EBS Snapshot은 삭제되지 않습니다. 개인 AWS Account에 비용 발생 Resource가 남지 않았는지 EC2와 VPC Console에서 최종 확인합니다.
 
-- Local Tool/IAM/Credential Checkpoint: 35분
-- Terraform Workflow와 Network: 30분
-- Golden AMI 생성: 50분
-- Private ASG와 ALB: 45분
-- Kiro CLI AI Lab: 35분
-- Cleanup: 25분
-- Buffer: 20분
-- 이후 Optional Q&A: 1시간
+## Optional Q&A — 1시간
 
-가장 큰 병목은 Windows 10 WSL2 준비, Tool 설치/PATH, IAM 초기 로그인, AMI 생성 대기, Target Health 전환과 Kiro 로그인입니다. 사전 설치 Checkpoint와 강사용 예비 Golden AMI를 준비합니다.
+필수 4시간 과정 이후 희망자만 참여합니다.
 
-## 공식 설치 및 보안 문서
+질문에 따라 다룰 수 있는 주제:
 
-- [VS Code Setup](https://code.visualstudio.com/docs/setup/setup-overview)
-- [Git Install](https://git-scm.com/install/)
-- [Terraform Install](https://developer.hashicorp.com/terraform/install)
-- [AWS CLI v2 Install](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-- [Kiro CLI](https://kiro.dev/docs/cli/)
-- [AWS Root User Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html)
-- [Create an IAM User](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html)
-- [AWS CLI Configuration Files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html)
+- NAT Gateway와 VPC Endpoint
+- RDS
+- State와 Remote Backend
+- Module
+- `count`, `for_each`, `map(object)`
+- Naming과 Tagging
+- Kiro CLI
+- Terraform 실무 운영
+
+이 주제들은 필수 Hands-on 범위에 추가하지 않습니다.
+
+## 4시간 진행 Tip
+
+가장 큰 시간 병목:
+
+- Key Pair와 Remote-SSH 최초 연결
+- IAM Role/Instance Profile 전파
+- Ubuntu Tool 설치와 AWS Provider 다운로드
+- Golden Image Builder User Data
+- AMI 생성 대기
+- Target Group Health 전환
+- Cleanup
+
+교육 전 Role 생성 및 Remote-SSH를 사전 안내하고, 강사는 동일한 Ubuntu 24.04 Script를 리허설합니다. AMI 대기시간에는 Network Code를 설명하고 강사용 예비 Golden AMI를 준비합니다.
