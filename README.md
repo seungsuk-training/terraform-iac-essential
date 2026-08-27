@@ -242,6 +242,19 @@ Host terraform-lab
 
 VS Code 좌측 하단에 `SSH: terraform-lab`이 표시되면 성공입니다.
 
+Remote-SSH로 연결한 VS Code에서 Terminal → New Terminal을 열고 Development EC2의 Hostname을 `code-server`로 변경합니다.
+
+```bash
+sudo hostnamectl set-hostname code-server
+hostnamectl --static
+```
+
+두 번째 명령의 결과가 `code-server`이면 설정이 완료된 것입니다. 기존 Terminal Prompt에는 이전 Hostname이 남아 있을 수 있으므로 Terminal을 새로 열거나 Remote-SSH로 다시 연결합니다.
+
+```text
+ubuntu@code-server:~$
+```
+
 Troubleshooting:
 
 - Timeout: Development EC2가 Running인지, Public IP와 Security Group SSH Source가 현재 `My IP`인지 확인
