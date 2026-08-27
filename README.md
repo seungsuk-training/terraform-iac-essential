@@ -298,10 +298,11 @@ Script는 Ubuntu 24.04에서 다음을 수행합니다.
 - HashiCorp 공식 APT Repository 구성
 - Terraform 설치
 - AWS 공식 Installer로 AWS CLI v2 설치
-- Kiro 공식 Installer로 Kiro CLI 설치
+- Kiro 공식 Installer로 Kiro CLI를 `~/.local/bin`에 설치
+- 기존 Remote-SSH Terminal에서도 실행되도록 `/usr/local/bin/kiro-cli` Link 구성
 - Version 출력
 
-반복 실행해도 기존 Repository와 설치를 재사용하도록 구성했습니다.
+반복 실행해도 기존 Repository와 설치를 재사용하도록 구성했습니다. 설치 Script가 끝난 직후 같은 Terminal에서 `kiro-cli --version`을 실행할 수 있습니다.
 
 VS Code에서 `File → Open Folder`를 선택하고 다음 Remote Directory를 엽니다.
 

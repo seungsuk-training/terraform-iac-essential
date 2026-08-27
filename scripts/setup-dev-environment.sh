@@ -63,17 +63,20 @@ if ! command -v aws >/dev/null 2>&1 ||
   fi
 fi
 
-export PATH="${HOME}/.local/bin:${PATH}"
-if ! command -v kiro-cli >/dev/null 2>&1; then
+kiro_cli_path="${HOME}/.local/bin/kiro-cli"
+if [[ ! -x "${kiro_cli_path}" ]]; then
   curl -fsSL https://cli.kiro.dev/install | bash
-  hash -r
 fi
 
-if ! command -v kiro-cli >/dev/null 2>&1; then
-  echo "Kiro CLI was installed, but kiro-cli is not on PATH." >&2
-  echo "Open a new terminal and run kiro-cli --version." >&2
+if [[ ! -x "${kiro_cli_path}" ]]; then
+  echo "Kiro CLI installation did not create ${kiro_cli_path}." >&2
   exit 1
 fi
+
+# VS Code Remote-SSH terminals do not always reload ~/.profile. Expose the
+# user-scoped installation through a directory already present on PATH.
+sudo ln -sfn "${kiro_cli_path}" /usr/local/bin/kiro-cli
+hash -r
 
 echo
 echo "Development environment is ready."
