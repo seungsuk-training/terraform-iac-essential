@@ -1,255 +1,295 @@
-# Kiro CLI를 활용한 AI-assisted IaC Lab
+# Kiro CLI 필수 AI-assisted IaC Lab
 
-이 Lab은 AWS CloudShell에서 Kiro CLI를 설치하고 현재 Terraform 프로젝트를 분석하는 과정입니다. AI에게 처음부터 코드 변경을 맡기지 않고 분석 → 작은 변경안 → Terraform 검증 → 사람의 승인 순서로 진행합니다.
+이 Lab은 완성된 Terraform Architecture를 교육생 각자의 Local PC에서 Kiro CLI로 분석하고, AI의 개선안을 사람이 검토하는 필수 실습입니다.
 
-## 1. CloudShell과 프로젝트 확인
+> AI는 Terraform과 Architecture를 대신 이해해 주는 도구가 아닙니다. Terraform과 Architecture를 이해한 사람이 AI를 활용하면 코드 생성, 분석, Refactoring 및 검증을 더 빠르게 수행할 수 있습니다.
 
-AWS Console 상단의 CloudShell 아이콘을 선택한 후 저장소로 이동합니다.
+## 1. Kiro CLI 설치 확인
 
-```bash
-cd ~/terraform-iac-essential
-pwd
-git status
-terraform version
-```
+공식 문서: https://kiro.dev/docs/cli/
 
-예상 결과:
-
-- 현재 경로가 `terraform-iac-essential`
-- Git 작업 트리 상태가 출력됨
-- Terraform CLI 버전이 출력됨
-
-Kiro CLI는 현재 디렉터리의 파일을 프로젝트 Context로 사용하므로 반드시 저장소 루트에서 시작합니다.
-
-## 2. Kiro CLI 설치
-
-Kiro 공식 Linux 설치 스크립트를 실행합니다.
+- macOS/Linux:
 
 ```bash
 curl -fsSL https://cli.kiro.dev/install | bash
 ```
 
-설치가 끝나면 현재 Shell이 새 PATH 설정을 읽도록 다시 시작하거나 다음 명령을 실행합니다.
+- Windows 11: 공식 Kiro CLI 문서에서 Windows를 선택하여 PowerShell 설치 절차를 실행합니다.
+- Windows 10: Kiro CLI의 현재 Native 지원 대상이 아니므로 WSL2 Ubuntu 안에서 Linux 설치 명령을 실행합니다.
 
-```bash
-source ~/.bashrc
-```
-
-버전을 확인합니다.
+새 Terminal에서 확인합니다.
 
 ```bash
 kiro-cli --version
 ```
 
-버전이 출력되면 설치 성공입니다.
+명령을 찾지 못하면 Terminal을 다시 열고 Installer가 안내한 경로가 PATH에 포함됐는지 확인합니다. macOS/Linux의 일반적인 사용자 실행 경로는 `$HOME/.local/bin`입니다.
 
-### `kiro-cli: command not found`가 표시되는 경우
-
-먼저 설치 메시지에 출력된 설치 경로를 확인합니다. 새 CloudShell Terminal을 열어 다시 실행하거나 다음과 같이 일반적인 사용자 실행 경로를 PATH에 추가합니다.
+## 2. Kiro 로그인
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
-kiro-cli --version
-```
-
-CloudShell을 다시 열어도 적용되게 하려면 한 번만 다음을 실행합니다.
-
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-설치 스크립트가 다른 경로를 안내했다면 출력된 경로를 우선 사용합니다.
-
-## 3. Kiro CLI 로그인
-
-CloudShell은 원격 Terminal이므로 Device Flow를 명시적으로 사용합니다.
-
-```bash
-kiro-cli login --use-device-flow
-```
-
-1. Terminal에 표시된 URL을 새 Browser Tab에서 엽니다.
-2. Terminal에 표시된 일회용 Code를 입력합니다.
-3. Builder ID, GitHub, Google 또는 교육에서 지정한 조직 계정으로 인증합니다.
-4. 인증 완료 후 CloudShell로 돌아옵니다.
-
-로그인 사용자를 확인합니다.
-
-```bash
+kiro-cli login
 kiro-cli whoami
 ```
 
-사용자 또는 인증 정보가 출력되면 로그인 성공입니다. 인증 시간이 만료되면 `kiro-cli login --use-device-flow`를 다시 실행합니다.
+Browser에서 Builder ID, GitHub, Google 또는 교육에서 지정한 조직 계정으로 인증합니다. Kiro 로그인은 AWS CLI의 `tf-user` Credential과 별개입니다. Password, Device Code, Token을 Terraform 파일이나 Git에 기록하지 않습니다.
 
-> AWS Console의 실습용 IAM 로그인과 Kiro 로그인이 항상 같은 Identity인 것은 아닙니다. 강사가 안내한 Kiro 인증 방식을 사용하세요. Password, Device Code, Token을 README, Terraform 파일 또는 Git에 저장하지 않습니다.
+## 3. Repository Root에서 시작
 
-## 4. Terraform 프로젝트에서 Kiro CLI 시작
-
-저장소 루트인지 다시 확인하고 Kiro CLI를 시작합니다.
+Kiro CLI는 시작한 Directory의 파일을 Project Context로 사용합니다. Terraform Working Directory가 아니라 Repository Root에서 시작합니다.
 
 ```bash
-cd ~/terraform-iac-essential
+cd <terraform-iac-essential 경로>
+pwd
+git status
 kiro-cli
 ```
 
-Interactive Prompt가 나타나면 먼저 다음처럼 읽기 전용 요청으로 동작을 확인합니다.
+Windows PowerShell 예:
 
-```text
-현재 디렉터리의 파일 구조를 요약해 주세요.
-파일을 수정하거나 terraform apply를 실행하지 마세요.
+```powershell
+cd C:\Users\<사용자명>\terraform-iac-essential
+Get-Location
+git status
+kiro-cli
 ```
 
-예상 결과: `README.md`, `terraform/`, `userdata/`, `ai/`와 주요 Terraform 파일의 역할을 요약합니다.
+첫 요청으로 Project를 제대로 읽는지 확인합니다.
 
-종료가 필요하면 Kiro CLI의 종료 명령 안내를 따르거나 `Ctrl+C`를 사용합니다.
+```text
+현재 프로젝트의 Directory 구조와 각 Terraform 파일의 역할을 요약해 주세요.
+파일을 수정하거나 terraform apply, terraform destroy 또는 AWS Resource를
+변경하는 명령은 실행하지 마세요.
+```
 
-## 5. Prompt 1 — 분석만 요청
+예상 결과: `terraform/`, `userdata/`, `ai/`와 VPC, Security Group, ASG, ALB 파일의 역할을 요약합니다.
 
-아래 Prompt를 Kiro CLI에 붙여넣습니다.
+## 4. Prompt 1 — 변경하지 말고 분석
+
+다음 Prompt를 붙여넣습니다.
 
 ```text
 현재 Terraform 프로젝트를 분석해 주세요.
 
 다음 관점에서 개선할 부분을 찾아주세요.
+
 - 반복되는 코드
-- 변수화
+- Variable
 - Naming
 - Tagging
 - Security
 - Availability
 - Maintainability
 
-코드를 바로 변경하지 말고, 현재 구조의 장점과 개선 가능한 부분을 먼저 설명해 주세요.
-특히 명시적으로 반복된 Subnet Resource가 향후 map(object)와 for_each로
-리팩터링될 수 있는지도 설명해 주세요.
+코드를 바로 변경하지 말고,
+현재 Architecture와 Terraform 코드의 장점 및 개선 가능한 부분을 먼저 설명해 주세요.
 
-terraform apply, terraform destroy 또는 AWS Resource를 변경하는 명령은 실행하지 마세요.
+특히 다음 관계가 코드에서 올바른지 확인해 주세요.
+
+- ALB는 두 Public Subnet에 배치
+- Auto Scaling Group은 두 Private Subnet에 배치
+- Web Instance에는 Public IP가 없음
+- Web Security Group의 HTTP Source는 ALB Security Group
+- Launch Template은 golden_ami_id Variable 사용
+- Auto Scaling Group은 Target Group과 연결
+- NAT Gateway와 RDS는 의도적으로 제외
+
+terraform apply, terraform destroy 또는 AWS Resource를 변경하는 명령은
+실행하지 마세요.
 ```
 
-확인할 내용:
+사람이 확인할 내용:
 
-- VPC와 네 Subnet이 명시적으로 작성된 교육적 이유
-- Public ALB와 Private ASG 배치
-- ALB Security Group만 Web Security Group에 접근 가능
-- 반복된 Subnet Resource가 향후 리팩터링 후보인지
-- NAT Gateway가 없는 Architecture Decision
+- AI가 현재 Architecture를 정확히 이해했는가?
+- 보안상 실제 문제와 교육 목적의 단순화를 구분했는가?
+- 명시적으로 반복된 네 Subnet을 향후 개선 후보로 발견했는가?
+- 기본 Essential Lab에 고급 문법을 무조건 적용하라고 제안하지는 않는가?
 
-## 6. Prompt 2 — 작은 변경 후보
+## 5. Prompt 2 — 반복 Resource 리팩터링 설계
 
-첫 분석 결과 중 하나만 선택합니다. 다음 예시는 공통 Tag의 일관성을 검토하지만 아직 파일을 변경하지 않습니다.
+기본 코드를 바로 수정하지 않고 설계 차이를 먼저 비교합니다.
 
 ```text
-앞서 제안한 개선점 중 공통 Tag 일관성 하나만 선택해 주세요.
+명시적으로 반복 작성된 Public/Private Subnet Resource를 대상으로
+향후 사용할 수 있는 Refactoring 방향을 설명해 주세요.
 
-초심자가 이해할 수 있는 작은 변경안, 변경 대상 파일,
-예상 terraform plan 결과를 먼저 설명해 주세요.
+Repeated Resource
+→ map(object)
+→ for_each
+
+현재 명시적 Resource 방식과 for_each 방식의 장단점을
+Terraform 초심자 교육과 유지보수 관점에서 비교해 주세요.
+
+아직 파일을 수정하지 말고 예상 Resource Address 변화와
+기존 Terraform State에 미치는 영향도 설명해 주세요.
+terraform apply와 terraform destroy는 실행하지 마세요.
+```
+
+핵심 학습 포인트:
+
+```text
+명시적 Resource
+→ 각 Resource와 Reference를 쉽게 읽음
+
+map(object) + for_each
+→ 반복 감소와 확장성 향상
+→ Resource Address와 State 변화 이해 필요
+```
+
+이번 4시간 Essential Source 자체는 `for_each` 기반으로 전면 변경하지 않습니다.
+
+## 6. Prompt 3 — 작은 개선 하나 선택
+
+분석 결과에서 Architecture를 바꾸지 않는 작은 개선 하나만 선택합니다.
+
+```text
+앞서 제안한 개선 후보 중 Architecture와 Resource Address를 변경하지 않는
+작은 개선 하나만 선택해 주세요.
+
+다음을 먼저 설명해 주세요.
+
+1. 선택한 이유
+2. 변경할 파일과 정확한 범위
+3. 예상 terraform plan 결과
+4. 보안 또는 가용성에 미치는 영향
+
 내 승인을 받기 전에는 파일을 수정하지 마세요.
-
 count, for_each, module, dynamic block은 사용하지 마세요.
 terraform apply와 terraform destroy는 실행하지 마세요.
 ```
 
-Kiro의 설명을 사람이 검토한 후 변경이 적절할 때만 명시적으로 수정을 승인합니다.
+설명이 적절할 때만 제한된 변경을 승인합니다.
 
 ```text
-제안한 변경만 적용해 주세요.
-그 외 Resource, Variable, Naming은 변경하지 마세요.
+제안한 변경 하나만 적용해 주세요.
+그 외 Resource, Variable, Naming과 Architecture는 변경하지 마세요.
 terraform apply와 terraform destroy는 실행하지 마세요.
 ```
 
-변경 직후 Git Diff를 직접 확인합니다.
+## 7. Human Review
+
+Kiro가 변경한 내용을 직접 확인합니다.
 
 ```bash
 git diff
 ```
 
-예상하지 않은 파일이나 Resource 변경이 있으면 Apply하지 말고 원인을 먼저 확인합니다.
+Windows PowerShell에서도 동일합니다.
 
-## 7. Prompt 3 — 변경 후 검토
+확인 사항:
+
+- 요청하지 않은 파일이 바뀌지 않았는가?
+- Resource 삭제 또는 이름 변경이 없는가?
+- Access Key, Secret Key, Account ID가 포함되지 않았는가?
+- `golden_ami_id`가 다른 교육생의 값으로 바뀌지 않았는가?
+- 기본 Architecture가 유지되는가?
+
+예상하지 않은 변경이 있으면 Apply하지 말고 Kiro에게 변경 이유와 원복 범위를 먼저 설명하도록 요청합니다.
+
+## 8. Prompt 4 — 변경 후 검토
 
 ```text
-변경된 Terraform 코드를 검토해 주세요.
+변경된 Terraform 코드를 다시 검토해 주세요.
 
 다음을 확인해 주세요.
+
 - Resource Reference 오류
-- Security Group 연결
+- ALB Security Group과 Web Security Group 연결
 - ALB의 Public Subnet 배치
 - ASG의 Private Subnet 배치
+- Web Instance Public IP 비활성화
 - Launch Template의 Golden AMI 연결
 - ASG와 Target Group 연결
 - terraform destroy 시 Dependency 문제
 
-오류 가능성과 확인 방법을 설명하되,
+오류 가능성과 사람이 확인할 방법을 설명하되,
 terraform apply와 terraform destroy는 실행하지 마세요.
 ```
 
-## 8. Terraform 명령으로 검증
+## 9. Terraform CLI로 검증
 
-Kiro의 설명만 믿지 않고 CloudShell에서 직접 검증합니다.
+AI의 설명만 믿지 않고 Local Terminal에서 직접 검증합니다.
 
 ```bash
-cd ~/terraform-iac-essential/terraform
-terraform fmt -recursive
+cd terraform
+terraform fmt
 terraform validate
 terraform plan
 ```
 
-검증 순서는 항상 다음과 같습니다.
+Plan에서 다음을 검토합니다.
 
-```text
-AI Suggestion
-→ Code Change
-→ git diff
-→ terraform fmt
-→ terraform validate
-→ terraform plan
-→ Human Review
-→ terraform apply
-```
+- 의도하지 않은 Destroy 또는 Replace가 없는가?
+- 변경 Resource와 Attribute가 요청한 범위인가?
+- 예상 비용과 보안 영향은 적절한가?
+- Plan을 설명할 수 있는가?
 
-Plan에서 의도하지 않은 삭제나 교체가 보이면 Apply하지 않습니다. 본 AI Lab 시간에는 강사가 별도로 안내하지 않는 한 분석과 Plan 검토까지만 수행합니다.
-
-## 9. Troubleshooting
-
-### 설치 다운로드 실패
+강사가 승인한 경우에만 Apply합니다.
 
 ```bash
-curl -I https://cli.kiro.dev/install
+terraform apply
 ```
 
-CloudShell의 Internet 연결과 조직의 Proxy/Firewall 정책을 확인합니다. Proxy 환경에서는 담당자가 제공한 `HTTPS_PROXY` 설정을 사용합니다.
+전체 Workflow:
 
-### 로그인 Browser가 자동으로 열리지 않음
+```text
+Human
+  ↓
+Architecture / Requirement
+  ↓
+AI Analysis
+  ↓
+Human Review
+  ↓
+Limited Code Change
+  ↓
+git diff
+  ↓
+terraform fmt
+  ↓
+terraform validate
+  ↓
+terraform plan
+  ↓
+Human Verification
+  ↓
+terraform apply
+```
 
-CloudShell에서는 정상적인 상황입니다. 다음 명령을 사용하고 출력된 URL을 직접 Browser에서 엽니다.
+## 10. Troubleshooting
+
+### Kiro가 다른 Project를 분석함
+
+Kiro CLI를 종료하고 Repository Root에서 다시 시작합니다.
+
+```bash
+cd <terraform-iac-essential 경로>
+kiro-cli
+```
+
+### Kiro가 바로 파일을 수정하려고 함
+
+다음 제약을 다시 전달합니다.
+
+```text
+지금은 분석 단계입니다.
+파일을 수정하거나 terraform apply/destroy를 실행하지 마세요.
+변경안과 예상 Plan만 설명해 주세요.
+```
+
+### Login Browser가 열리지 않음
 
 ```bash
 kiro-cli login --use-device-flow
 ```
 
-### 다른 프로젝트를 분석함
+출력된 URL과 일회용 Code를 Browser에서 사용합니다.
 
-Kiro CLI를 종료한 후 저장소 루트에서 다시 시작합니다.
-
-```bash
-cd ~/terraform-iac-essential
-pwd
-kiro-cli
-```
-
-### 인증 상태 초기화
-
-공용 또는 재사용 계정 정책상 로그아웃이 필요할 때만 실행합니다.
+### 인증 상태 확인 또는 종료
 
 ```bash
+kiro-cli whoami
 kiro-cli logout
 ```
 
-> AI는 Terraform과 Architecture를 대신 이해해 주는 것이 아니라, Terraform과 Architecture를 이해한 사람이 더 빠르게 개발하고 개선할 수 있도록 돕는 도구입니다.
-
-## 참고 문서
-
-- Kiro CLI: https://kiro.dev/docs/cli/
-- Kiro CLI 명령어: https://kiro.dev/docs/cli/reference/cli-commands/
-- Kiro 인증: https://kiro.dev/docs/getting-started/authentication/
+교육생 개인 PC라면 과정 후 반드시 Logout할 필요는 없습니다. 공용 PC에서는 Logout하고 Credential이 남지 않았는지 확인합니다.
