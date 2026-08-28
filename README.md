@@ -602,7 +602,7 @@ kiro-cli
 3. 반복, Variable, Naming, Tagging, Security, Availability, Maintainability 개선안 확인
 4. AI Output을 그대로 정답으로 사용하지 않고 사람이 검토해야 한다는 Workflow 이해
 
-명시적으로 작성한 Subnet Resource에서 반복을 발견했다면 다음 8일 과정의 발전 흐름을 Preview합니다.
+명시적으로 작성한 Subnet Resource에서 반복을 발견했다면 다음과 같이 발전 흐름을 Preview합니다.
 
 ```text
 명시적 Resource 작성
